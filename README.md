@@ -19,3 +19,13 @@ The `datasets/PopulationEstimates.csv` and `datasets/PovertyEstimates.csv` files
 - **fips**: The 5-digit [Federal Information Processing Series](https://www.census.gov/quickfacts/fact/note/US/fips) code for the state and county, in `SSCCC` format
 - **cases**: The cumulative number of laboratory-confirmed and probable cases of COVID-19 in the county to date, according to [this standardized criteria](https://int.nyt.com/data/documenthelper/6908-cste-interim-20-id-01-covid-19/85d47e89b637cd643d50/optimized/full.pdf)
 - **deaths**: The cumulative number of deaths related to COVID-19 in the county to date, according to the above criteria
+
+`datasets/us-counties.csv`
+- **date**: The date the record is for in `YYYY-MM-DD` format
+- **state**: The full name of the state
+- **fips**: The 2-digit [Federal Information Processing Series](https://www.census.gov/quickfacts/fact/note/US/fips) code for the state, in `SS` format
+- **cases**: The cumulative number of laboratory-confirmed and probable cases of COVID-19 in the state to date, according to [this standardized criteria](https://int.nyt.com/data/documenthelper/6908-cste-interim-20-id-01-covid-19/85d47e89b637cd643d50/optimized/full.pdf)
+- **deaths**: The cumulative number of deaths related to COVID-19 in the state to date, according to the above criteria
+
+`datasets/PopulationEstimates.csv`
+- **FIPStxt**: The 1-, 4-, or 5-digit [Federal Information Processing Series](https://www.census.gov/quickfacts/fact/note/US/fips) code for the location, in `SCCC` or `SSCCC` format except for the 1-digit national data record
