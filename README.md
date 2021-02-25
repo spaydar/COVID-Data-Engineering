@@ -11,3 +11,11 @@ The `datasets/us-counties.csv` and `datasets/us-states.csv` files contain histor
 The `datasets/PopulationEstimates.csv` and `datasets/PovertyEstimates.csv` files contain estimates of US population and poverty [from the Economic Research Service at the US Department of Agriculture](https://www.ers.usda.gov/data-products/county-level-data-sets/download-data/), based on data from the US Census Bureau. See [here](https://www.ers.usda.gov/data-products/county-level-data-sets/documentation/) for documentation and further information about methodology.
 
 ### Dataset Dictionary
+
+`datasets/us-counties.csv`
+- **date**: The date the record is for in `YYYY-MM-DD` format
+- **county**: The name of the county
+- **state**: The full name of the state that the county is in
+- **fips**: The 5-digit [Federal Information Processing Series](https://www.census.gov/quickfacts/fact/note/US/fips) code for the state and county, in `SSCCC` format
+- **cases**: The cumulative number of laboratory-confirmed and probable cases of COVID-19 in the county to date, according to [this standardized criteria](https://int.nyt.com/data/documenthelper/6908-cste-interim-20-id-01-covid-19/85d47e89b637cd643d50/optimized/full.pdf)
+- **deaths**: The cumulative number of deaths related to COVID-19 in the county to date, according to the above criteria
