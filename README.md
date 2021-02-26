@@ -137,16 +137,19 @@ While the population and poverty data largely contain numeric types that could b
 ### Data Cleaning
 
 The following steps were necessary to clean the data such that it could be joined and transformed to fit the desired data model:
-1. `datasets/us-counties.csv`:
+1. `datasets/us-counties.csv`
     - Drop rows where `fips` is null
-        - This is necessary since `fips` is part of a unique identifier for the fact table
-2. `datasets/us-states.csv`:
+        - This is necessary since `fips` is part of the unique identifier for the fact table
+        
+2. `datasets/us-states.csv`
     - Append '000' to `fips` values to complete state-county 5-digit format
         - This allows the states' `fips` format to conform that of the other datasets, allowing them to be joined on this column
-3. `datasets/PopulationEstimates.csv`:
+        
+3. `datasets/PopulationEstimates.csv`
     - Prepend '0' to `fips` codes that only have a single digit in the state code
     - Remove commas from numeric values using regular expressions in order to allow casting to integer types
-4. `datasets/PovertyEstimates.csv`:
+    
+4. `datasets/PovertyEstimates.csv`
     - Prepend '0' to `fips` codes that only have a single digit in the state code
     - Transform data to have dedicated columns for attributes and one row per `fips`
         - This involves copying attributes to their own columns and creating empty columns for other attributes for each row, grouping by `fips`, then reducing to one row per `fips`
@@ -158,7 +161,7 @@ The following steps were necessary to clean the data such that it could be joine
 
 Two data quality checks are performed on the fact table:
 1. Check that the fact table has greater than zero rows
-2. Check that there are no null values in either the `date` or `fips` columns of the fact table as these jointly serve as a unique identifier for each row and connect the fact table to all the dimension tables
+2. Check that there are no null values in either the `date` or `fips` columns of the fact table as these jointly serve as the unique identifier for each row and connect the fact table to all the dimension tables
 
 ### Technology Justification
 
@@ -166,6 +169,19 @@ I chose to use Spark to implement this project since it is an intuitive data pro
 
 ## File and Code Structure
 
+The datasets used in this project are stored in the `datasets` directory. All logic to instantiate a SparkSession and run the ETL pipeline are contained in the `etl.py` script, which can be run from the terminal with the `python3 etl.py` command. The resulting star schema dataframes will be written to a directory called `output_data` in parquet file format upon running the pipeline.
+
 ## Considerations for Scaling Up
+
+The following describe the necessary steps to be taken in order handle the scale-up scenarios below:
+
+1. The data was increased by 100x
+    - The script already uses Apache Spark, a big-data processing tool, so it would not be necessary to change the technology being used. However, it would be necessary to deploy the solution in a multi-node context such as AWS EMR in order to handle a 100x increase in data.
+    
+2. The pipelines would be run on a daily basis by 7am every day
+    - In order to run the pipeline everyday, it would be best to automate this process with Apache Airflow. Airflow is an intuitive technology that allows data engineers to automate data pipelines with auto-retry and notification in case of failure. This tool could also be used to automate a script that retrieves the newest version of the New York Times COVID-19 datasets, which are updated daily.
+    
+3. The database needed to be accessed by 100+ people
+    - If the database needed to be accessed by 100+ people, it would be necessary to host the database on a cloud service that auto-scales resources according to need or host it on managed on-prem servers that are properly load-balanced by a service like NGINX.
 
 ## Additional Sample PySpark Commands
