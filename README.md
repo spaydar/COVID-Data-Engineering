@@ -124,15 +124,15 @@ The data lake consists of 5 parquet files modeled according to the following sta
 
 The `covid_facts` parquet file is partitioned by date. The `date_dim` parquet file is partitioned by year and month. The `location_dim` is partitioned by state. 
 
-The unique identifier for the fact table is the combination of `date` and `fips` as the NYT COVID datasets provide data per location per day, meaning that there are multiple entries per `fips` (location). The date dimension table is uniquely identified by date, and the rest of the dimension tables are uniquely identified by `fips`.
+The unique identifier for the fact table is the combination of `date` and `fips` as the NYT COVID datasets provide data per location per day, meaning that there are multiple entries per `fips` (location). The date dimension table is uniquely identified by `date`, and the rest of the dimension tables are uniquely identified by `fips`.
 
 ### Data Model Justification
 
 I chose to model the data as a star schema because the purpose of the database is to find insights about the spread of and fatalities caused by COVID-19 as they relate to time, location, population size, ruralness/urban-ness, economic dependence type, and poverty. Since the main factor considered is COVID spread and fatality, I made a `covid_facts` table to store all facts about COVID cases and deaths per `fips` per day; this means that state-level and county-level facts both reside in the same table. 
 
-It is intuitive that the `date` and `fips` fact columns could have their own dimension tables to describe the details of those attributes. The `date` timestamp is easily broken down into smaller time components, which can be used in different analyses that relate to COVID spread throughout a given week, month or year. The `fips` code is meaningless by itself without information about the name of the state, the state abbreviation, and the county name associated with a given code, and thus there is a location dimension table to avoid redundant descriptors in the fact table.
+It is intuitive that the `date` and `fips` fact columns could have their own dimension tables to describe the details of those attributes. The `date` timestamp is easily broken down into smaller date components, which can be used in different analyses that relate to COVID spread throughout a given week, month or year. The `fips` code is meaningless by itself without information about the name of the state, the state abbreviation, and the county name associated with a given code, and thus there is a location dimension table to avoid redundant descriptors in the fact table.
 
-While the population and poverty data largely contain numeric types that could be used as facts in a different context, they are used as additional dimesions of location as the data they provide are for a year-long timescale whereas the NYT COVID data is provided on a daily timescale. Therefore, it is more useful to consider these data as additional descriptors for a given location that might provide insights about the spread of COVID as it relates to population size, population density, and poverty. Only the most recent estimates for population and poverty are included in the final model in order to provide the most accurate data to make analyses from.
+While the population and poverty data largely contain numeric types that could be used as facts in a different context, they are used as additional dimesions of location as the data they provide cover a year-long timescale whereas the NYT COVID data is provided on a daily timescale. Therefore, it is more useful to consider these data as additional descriptors for a given location that might provide insights about the spread of COVID as it relates to population size, population density, and poverty. Only the most recent estimates for population and poverty are included in the final model in order to provide the most accurate data to make analyses from.
 
 ### Data Cleaning
 
@@ -156,6 +156,73 @@ The following steps were necessary to clean the data such that it could be joine
         - This is necessary to ensure that there is one data type per column and that column type is not dependent on another column
 
 ## ETL Pipeline
+
+The ETL pipeline begins by extracting data from the CSV files in the `datasets` directory into Spark dataframes, sometimes with an explicit schema. This is done using commands that include the following:
+
+    schema_counties = StructType([
+        StructField("date", TimestampType()),
+        StructField("county", StringType()),
+        StructField("state", StringType()),
+        StructField("fips", StringType()),
+        StructField("cases", IntegerType()),
+        StructField("deaths", IntegerType())
+    ])
+    
+    county_cases_filepath = input_data + "us-counties.csv"
+    
+    df_counties = spark.read.csv(county_cases_filepath, header=True, schema=schema_counties).dropna(subset=["fips"])
+    
+Then, data is cleaned and transformed in order to conform to the target data model using commands that include the following:
+
+    df_states = df_states.withColumn("fips", concat(df_states["fips"], lit("000")))
+    
+    covid_facts = df_counties.select("date", "fips", "cases", "deaths").union(df_states.select("date", "fips", "cases", "deaths"))
+    
+    ...
+    
+    location_dim = df_states.select("fips", "state").dropDuplicates().withColumn("county", lit(None).cast(StringType())) \
+                .union(df_counties.select("fips", "state", "county").dropDuplicates())
+    
+    temp_location_df = df_population.withColumn("state_abrv", df_population["State"]).withColumn("fips_state", substring(df_population["FIPStxt"], 1, 2)) \
+                        .select("fips_state", "state_abrv").dropDuplicates()
+    
+    location_dim = location_dim.join(temp_location_df, [substring(location_dim.fips, 1, 2) == temp_location_df.fips_state], "left").drop("fips_state")
+        
+    ...
+    
+    df_poverty = df_poverty.withColumn("FIPStxt", when(length("FIPStxt") == 4, concat(lit("0"), col("FIPStxt"))) \
+                                         .otherwise(col("FIPStxt")))
+    
+    df_poverty = df_poverty.withColumn("fips", df_poverty["FIPStxt"]) \
+                    .withColumn("POV_ALL_2019", when(df_poverty["Attribute"] == "POVALL_2019", df_poverty["Value"]).cast(IntegerType())) \
+                    .withColumn("PCT_POV_ALL_2019", when(df_poverty["Attribute"] == "PCTPOVALL_2019", df_poverty["Value"]).cast(FloatType())) \
+                    .withColumn("POV_0-17_2019", when(df_poverty["Attribute"] == "POV017_2019", df_poverty["Value"]).cast(IntegerType())) \
+                    .withColumn("PCT_POV_0-17_2019", when(df_poverty["Attribute"] == "PCTPOV017_2019", df_poverty["Value"]).cast(FloatType())) \
+                    .withColumn("POV_5-17_2019", when(df_poverty["Attribute"] == "POV517_2019", df_poverty["Value"]).cast(IntegerType())) \
+                    .withColumn("PCT_POV_5-17_2019", when(df_poverty["Attribute"] == "PCTPOV517_2019", df_poverty["Value"]).cast(FloatType())) \
+                    .withColumn("MED_HH_INC_2019", when(df_poverty["Attribute"] == "MEDHHINC_2019", df_poverty["Value"]).cast(IntegerType())) \
+                    .withColumn("POV_0-4_2019", when(df_poverty["Attribute"] == "POV04_2019", df_poverty["Value"]).cast(IntegerType())) \
+                    .withColumn("PCT_POV_0-4_2019", when(df_poverty["Attribute"] == "PCTPOV04_2019", df_poverty["Value"]).cast(FloatType()))
+    
+    poverty_dim = df_poverty.drop("FIPStxt", "Stabr", "Area_name", "Attribute", "Value").groupBy("fips") \
+        .agg(collect_list("POV_ALL_2019").getItem(0).alias("POV_ALL_2019"), \
+             collect_list("PCT_POV_ALL_2019").getItem(0).alias("PCT_POV_ALL_2019"), \
+             collect_list("POV_0-17_2019").getItem(0).alias("POV_0-17_2019"), \
+             collect_list("PCT_POV_0-17_2019").getItem(0).alias("PCT_POV_0-17_2019"), \
+             collect_list("POV_5-17_2019").getItem(0).alias("POV_5-17_2019"), \
+             collect_list("PCT_POV_5-17_2019").getItem(0).alias("PCT_POV_5-17_2019"), \
+             collect_list("MED_HH_INC_2019").getItem(0).alias("MED_HH_INC_2019"), \
+             collect_list("POV_0-4_2019").getItem(0).alias("POV_0-4_2019"), \
+             collect_list("PCT_POV_0-4_2019").getItem(0).alias("PCT_POV_0-4_2019")
+            )
+
+Finally, the resulting dataframes are written to disk in parquet file format using commands that include the following:
+
+    date_dim.write.partitionBy("year", "month").parquet(output_data + "date_dim.parquet")
+    
+    ...
+    
+    population_dim.write.parquet(output_data + "population_dim.parquet")
 
 ### Data Quality Checks
 
@@ -185,3 +252,44 @@ The following describe the necessary steps to be taken in order handle the scale
     - If the database needed to be accessed by 100+ people, it would be necessary to host the database on a cloud service that auto-scales resources according to need or host it on managed on-prem servers that are properly load-balanced by a service like NGINX.
 
 ## Additional Sample PySpark Commands
+
+Extracts date attributes from a timestamp and creates a dimension table:
+
+    date_dim = covid_facts.select("date").dropDuplicates()
+    
+    date_dim = date_dim.withColumn("year", year(col("date"))) \
+        .withColumn("month", month(col("date"))) \
+        .withColumn("dayOfWeek", date_format(col("date"), "u").cast(IntegerType())) \
+        .withColumn("dayOfMonth", dayofmonth(col("date"))) \
+        .withColumn("dayOfYear", dayofyear(col("date"))) \
+        .withColumn("weekOfYear", weekofyear(col("date")))
+        
+Removes commas from numeric types and casts columns to integer and float types:
+
+    population_dim = df_population.withColumn("fips", df_population["FIPStxt"]) \
+                    .withColumn("Rural-urban_Continuum_Code_2013", df_population["Rural-urban_Continuum Code_2013"]) \
+                    .select("fips","Rural-urban_Continuum_Code_2013","Urban_Influence_Code_2013", \
+                           "Economic_typology_2015","POP_ESTIMATE_2019","N_POP_CHG_2019", \
+                           "Births_2019","Deaths_2019","NATURAL_INC_2019","INTERNATIONAL_MIG_2019", \
+                           "DOMESTIC_MIG_2019","NET_MIG_2019","RESIDUAL_2019","GQ_ESTIMATES_2019", \
+                           "R_birth_2019","R_death_2019","R_NATURAL_INC_2019","R_INTERNATIONAL_MIG_2019", \
+                           "R_DOMESTIC_MIG_2019","R_NET_MIG_2019") \
+                    .withColumn("Rural-urban_Continuum_Code_2013", col('Rural-urban_Continuum_Code_2013').cast(IntegerType())) \
+                    .withColumn("Urban_Influence_Code_2013", col('Urban_Influence_Code_2013').cast(IntegerType())) \
+                    .withColumn("Economic_typology_2015", col('Economic_typology_2015').cast(IntegerType())) \
+                    .withColumn("POP_ESTIMATE_2019", regexp_replace('POP_ESTIMATE_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("N_POP_CHG_2019", regexp_replace('N_POP_CHG_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("Births_2019", regexp_replace('Births_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("Deaths_2019", regexp_replace('Deaths_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("NATURAL_INC_2019", regexp_replace('NATURAL_INC_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("INTERNATIONAL_MIG_2019", regexp_replace('INTERNATIONAL_MIG_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("DOMESTIC_MIG_2019", regexp_replace('DOMESTIC_MIG_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("NET_MIG_2019", regexp_replace('NET_MIG_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("RESIDUAL_2019", regexp_replace('RESIDUAL_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("GQ_ESTIMATES_2019", regexp_replace('GQ_ESTIMATES_2019', ',', '').cast(IntegerType())) \
+                    .withColumn("R_birth_2019", col('R_birth_2019').cast(FloatType())) \
+                    .withColumn("R_death_2019", col('R_death_2019').cast(FloatType())) \
+                    .withColumn("R_NATURAL_INC_2019", col('R_NATURAL_INC_2019').cast(FloatType())) \
+                    .withColumn("R_INTERNATIONAL_MIG_2019", col('R_INTERNATIONAL_MIG_2019').cast(FloatType())) \
+                    .withColumn("R_DOMESTIC_MIG_2019", col('R_DOMESTIC_MIG_2019').cast(FloatType())) \
+                    .withColumn("R_NET_MIG_2019", col('R_NET_MIG_2019').cast(FloatType()))
