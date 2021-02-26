@@ -122,13 +122,24 @@ The data lake consists of 5 parquet files modeled according to the following sta
     - *POV_0-4_2019*: Estimate of children ages 0 to 4 in poverty 2019 (available for the U.S. and State total only). Integer type
     - *PCT_POV_0-4_2019*: Estimated percent of children ages 0 to 4 in poverty 2019. Float type
 
-The `covid_facts` parquet file is partitioned by date. The `date_dim` parquet file is partitioned by year and month. The `location_dim` is partitioned by state.
+The `covid_facts` parquet file is partitioned by date. The `date_dim` parquet file is partitioned by year and month. The `location_dim` is partitioned by state. 
+
+The unique identifier for the fact table is the combination of `date` and `fips` as the NYT COVID datasets provide data per location per day, meaning that there are multiple entries per `fips` (location). The date dimension table is uniquely identified by date, and the rest of the dimension tables are uniquely identified by `fips`.
 
 ### Data Model Justification
 
+I chose to model the data as a star schema because the purpose of the database is to find insights about the spread of and fatalities caused by COVID-19 as they relate to time, location, population size, ruralness/urban-ness, economic dependence type, and poverty. Since the main factor considered is COVID spread and fatality, I made a `covid_facts` table to store all facts about COVID cases and deaths per `fips` per day; this means that state-level and county-level facts both reside in the same table. 
 
+It is intuitive that the `date` and `fips` fact columns could have their own dimension tables to describe the details of those attributes. The `date` timestamp is easily broken down into smaller time components, which can be used in different analyses that relate to COVID spread throughout a given week, month or year. The `fips` code is meaningless by itself without information about the name of the state, the state abbreviation, and the county name associated with a given code, and thus there is a location dimension table to avoid redundant descriptors in the fact table.
+
+While the population and poverty data largely contain numeric types that could be used as facts in a different context, they are used as additional dimesions of location as the data they provide are for a year-long timescale whereas the NYT COVID data is provided on a daily timescale. Therefore, it is more useful to consider these data as additional descriptors for a given location that might provide insights about the spread of COVID as it relates to population size, population density, and poverty. Only the most recent estimates for population and poverty are included in the final model in order to provide the most accurate data to make analyses from.
+
+### Technology Justification
+
+I chose to use Spark to implement this project since it is an intuitive data processing tool that provides higher-level functions that make it easy to clean and transform data, an important requirement to meet for this dataset. Furthermore, it is well-suited to handle big data, an ability that will prove necessary as the size of this data increases as the COVID-19 pandemic continues on and additional data and schema are introduced to the data model.
 
 ### Data Cleaning
 
+The following steps were necessary to clean the data such that it could be joined and transformed to fit the desired data model:
 
 ### Data Quality Checks
