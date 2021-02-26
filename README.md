@@ -134,12 +134,20 @@ It is intuitive that the `date` and `fips` fact columns could have their own dim
 
 While the population and poverty data largely contain numeric types that could be used as facts in a different context, they are used as additional dimesions of location as the data they provide are for a year-long timescale whereas the NYT COVID data is provided on a daily timescale. Therefore, it is more useful to consider these data as additional descriptors for a given location that might provide insights about the spread of COVID as it relates to population size, population density, and poverty. Only the most recent estimates for population and poverty are included in the final model in order to provide the most accurate data to make analyses from.
 
-### Technology Justification
-
-I chose to use Spark to implement this project since it is an intuitive data processing tool that provides higher-level functions that make it easy to clean and transform data, an important requirement to meet for this dataset. Furthermore, it is well-suited to handle big data, an ability that will prove necessary as the size of this data increases as the COVID-19 pandemic continues on and additional data and schema are introduced to the data model.
-
 ### Data Cleaning
 
 The following steps were necessary to clean the data such that it could be joined and transformed to fit the desired data model:
 
+## ETL Pipeline
+
 ### Data Quality Checks
+
+### Technology Justification
+
+I chose to use Spark to implement this project since it is an intuitive data processing tool that provides higher-level functions that make it easy to clean and transform data, an important requirement to meet for this dataset. Furthermore, it is well-suited to handle big data, an ability that will prove necessary as the size of this data increases with the continuation of the COVID-19 pandemic and additional data and schema are introduced to the data model.
+
+## File and Code Structure
+
+## Considerations for Scaling Up
+
+## Additional Sample PySpark Commands
