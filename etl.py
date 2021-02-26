@@ -35,7 +35,7 @@ def etl(spark, input_data, output_data):
     
     county_cases_filepath = input_data + "us-counties.csv"
     
-    df_counties = spark.read.csv(county_cases_filepath, header=True, schema=schema_counties)
+    df_counties = spark.read.csv(county_cases_filepath, header=True, schema=schema_counties).dropna(subset=["fips"])
     
     
     
@@ -56,6 +56,12 @@ def etl(spark, input_data, output_data):
     
     
     covid_facts = df_counties.select("date", "fips", "cases", "deaths").union(df_states.select("date", "fips", "cases", "deaths"))
+    
+    if not covid_facts.count() > 0:
+        raise ValueError("covid_facts dataframe does not have more than zero rows")
+        
+    if covid_facts.select("date", "fips").where(col("date").isNull() | col("fips").isNull()).count() > 0:
+        raise ValueError("covid_facts dataframe has at least one null value in the date or fips column. count: " + covid_facts.select("date", "fips").where(col("date").isNull() | col("fips").isNull()).count())
     
     covid_facts.write.partitionBy("date").parquet(output_data + "covid_facts.parquet")
     
