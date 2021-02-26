@@ -55,8 +55,8 @@ The `datasets/PopulationEstimates.csv` and `datasets/PovertyEstimates.csv` files
 - **R_NET_MIG_2011-2019**: Net migration rate over the full year prior to July 1st of the given year
 
 `datasets/PovertyEstimates.csv`
-- **FIPStxt**:
-- **Stabr**:
-- **Area_name**:
-- **Attribute**:
-- **Value**:
+- **FIPStxt**: The 1-, 4-, or 5-digit [Federal Information Processing Series](https://www.census.gov/quickfacts/fact/note/US/fips) code for the location, in `SCCC` or `SSCCC` format except for the 1-digit national data record
+- **Stabr**: The 2-letter abbreviation for the state
+- **Area_name**: The full name of the county or state
+- **Attribute**: The type of data in the "Value" column. Either an estimate of people in poverty in a given demographic, a percentage of a population estimated to be in poverty, or a 90% confidence interval lower/upper bound of an estimate
+- **Value**: An estimate of one of the types described above
