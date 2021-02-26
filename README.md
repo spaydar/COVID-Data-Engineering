@@ -20,7 +20,7 @@ The `datasets/PopulationEstimates.csv` and `datasets/PovertyEstimates.csv` files
 - **cases**: The cumulative number of laboratory-confirmed and probable cases of COVID-19 in the county to date, according to [this standardized criteria](https://int.nyt.com/data/documenthelper/6908-cste-interim-20-id-01-covid-19/85d47e89b637cd643d50/optimized/full.pdf)
 - **deaths**: The cumulative number of deaths related to COVID-19 in the county to date, according to the above criteria
 
-`datasets/us-counties.csv`
+`datasets/us-states.csv`
 - **date**: The date the record is for in `YYYY-MM-DD` format
 - **state**: The full name of the state
 - **fips**: The 2-digit [Federal Information Processing Series](https://www.census.gov/quickfacts/fact/note/US/fips) code for the state, in `SS` format
@@ -137,10 +137,28 @@ While the population and poverty data largely contain numeric types that could b
 ### Data Cleaning
 
 The following steps were necessary to clean the data such that it could be joined and transformed to fit the desired data model:
+1. `datasets/us-counties.csv`:
+    - Drop rows where `fips` is null
+        - This is necessary since `fips` is part of a unique identifier for the fact table
+2. `datasets/us-states.csv`:
+    - Append '000' to `fips` values to complete state-county 5-digit format
+        - This allows the states' `fips` format to conform that of the other datasets, allowing them to be joined on this column
+3. `datasets/PopulationEstimates.csv`:
+    - Prepend '0' to `fips` codes that only have a single digit in the state code
+    - Remove commas from numeric values using regular expressions in order to allow casting to integer types
+4. `datasets/PovertyEstimates.csv`:
+    - Prepend '0' to `fips` codes that only have a single digit in the state code
+    - Transform data to have dedicated columns for attributes and one row per `fips`
+        - This involves copying attributes to their own columns and creating empty columns for other attributes for each row, grouping by `fips`, then reducing to one row per `fips`
+        - This is necessary to ensure that there is one data type per column and that column type is not dependent on another column
 
 ## ETL Pipeline
 
 ### Data Quality Checks
+
+Two data quality checks are performed on the fact table:
+1. Check that the fact table has greater than zero rows
+2. Check that there are no null values in either the `date` or `fips` columns of the fact table as these jointly serve as a unique identifier for each row and connect the fact table to all the dimension tables
 
 ### Technology Justification
 
